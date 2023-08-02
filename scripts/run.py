@@ -155,13 +155,13 @@ if __name__ == "__main__":
 		testbed.reload_network_from_file(args.network)
 
 	ref_transforms = {}
-	if args.screenshot_transforms: # try to load the given file straight away
-		print("Screenshot transforms from ", args.screenshot_transforms)
-		with open(args.screenshot_transforms) as f:
+	if args.screenshot_transforms: # try to load the given file straight away尝试直接加载给定的文件
+		print("Screenshot transforms from ", args.screenshot_transforms)#截图转换自
+		with open(args.screenshot_transforms) as f:#打开文件
 			ref_transforms = json.load(f)
 
-	if testbed.mode == ngp.TestbedMode.Sdf:
-		testbed.tonemap_curve = ngp.TonemapCurve.ACES
+	if testbed.mode == ngp.TestbedMode.Sdf:##################？
+		testbed.tonemap_curve = ngp.TonemapCurve.ACES##################？
 
 	testbed.nerf.sharpen = float(args.sharpen)
 	testbed.exposure = args.exposure
@@ -169,42 +169,43 @@ if __name__ == "__main__":
 
 
 	testbed.nerf.render_with_lens_distortion = True
-
+	#os.path.splitext分离文件名与扩展名，默认返回（'文件名','扩展名'）元组
+	#os.path.basename返回路径最后的文件名
 	network_stem = os.path.splitext(os.path.basename(args.network))[0] if args.network else "base"
-	if testbed.mode == ngp.TestbedMode.Sdf:
-		setup_colored_sdf(testbed, args.scene)
+	if testbed.mode == ngp.TestbedMode.Sdf:##################？
+		setup_colored_sdf(testbed, args.scene)##################？
 
 	if args.near_distance >= 0.0:
-		print("NeRF training ray near_distance ", args.near_distance)
+		print("NeRF training ray near_distance ", args.near_distance)#NeRF训练射线近距离
 		testbed.nerf.training.near_distance = args.near_distance
 
 	if args.nerf_compatibility:
-		print(f"NeRF compatibility mode enabled")
+		print(f"NeRF compatibility mode enabled")#NeRF兼容模式已启用
 
-		# Prior nerf papers accumulate/blend in the sRGB
-		# color space. This messes not only with background
-		# alpha, but also with DOF effects and the likes.
-		# We support this behavior, but we only enable it
+		# Prior nerf papers accumulate/blend in the sRGB先前的nerf论文在sRGB色彩空间中积累/混合。
+		# color space. This messes not only with background这不仅扰乱了背景alpha，也扰乱了DOF效果等等。
+		# alpha, but also with DOF effects and the likes.我们支持这种行为，
+		# We support this behavior, but we only enable it但我们只在需要将PSNR数与先前工作的结果进行比较的合成nerf数据的情况下启用它。
 		# for the case of synthetic nerf data where we need
 		# to compare PSNR numbers to results of prior work.
 		testbed.color_space = ngp.ColorSpace.SRGB
 
-		# No exponential cone tracing. Slightly increases
-		# quality at the cost of speed. This is done by
-		# default on scenes with AABB 1 (like the synthetic
+		# No exponential cone tracing. Slightly increases没有指数锥形追踪。以速度为代价稍微提高了质量。
+		# quality at the cost of speed. This is done by默认情况下，在使用AABB 1的场景中会这样做(如合成场景)，
+		# default on scenes with AABB 1 (like the synthetic但在更大的场景中不会。所以这里强制设置。
 		# ones), but not on larger scenes. So force the
 		# setting here.
 		testbed.nerf.cone_angle_constant = 0
 
-		# Match nerf paper behaviour and train on a fixed bg.
+		# Match nerf paper behaviour and train on a fixed bg.匹配nerf纸张行为并在固定bg上训练。
 		testbed.nerf.training.random_bg_color = False
 
 	old_training_step = 0
 	n_steps = args.n_steps
 
-	# If we loaded a snapshot, didn't specify a number of steps, _and_ didn't open a GUI,
-	# don't train by default and instead assume that the goal is to render screenshots,
-	# compute PSNR, or render a video.
+	# If we loaded a snapshot, didn't specify a number of steps, _and_ didn't open a GUI,如果我们加载了一个快照，
+	# don't train by default and instead assume that the goal is to render screenshots,没有指定许多步骤，_和_没有打开GUI，
+	# compute PSNR, or render a video.默认情况下不进行训练，而是假设目标是渲染截图、计算PSNR或渲染视频。
 	if n_steps < 0 and (not args.load_snapshot or args.gui):
 		n_steps = 35000
 
