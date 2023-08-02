@@ -25,48 +25,77 @@ from tqdm import tqdm
 import pyngp as ngp # noqa
 
 def parse_args():
+	#使用附加配置和输出选项运行即时神经图形图元
 	parser = argparse.ArgumentParser(description="Run instant neural graphics primitives with additional configuration & output options")
-
+	#要加载的文件。可以是场景、网络配置、快照、摄像机路径或它们的组合
 	parser.add_argument("files", nargs="*", help="Files to be loaded. Can be a scene, network config, snapshot, camera path, or a combination of those.")
-
+	#要加载的场景。可以是场景的名称或训练数据的完整路径。可以是NeRF数据集，a *。obj/*。用于训练SDF、图像或*的stl网格。nvdb卷
 	parser.add_argument("--scene", "--training_data", default="", help="The scene to load. Can be the scene's name or a full path to the training data. Can be NeRF dataset, a *.obj/*.stl mesh for training a SDF, an image, or a *.nvdb volume.")
+	#阻止参数显示在默认帮助输出中
 	parser.add_argument("--mode", default="", type=str, help=argparse.SUPPRESS) # deprecated
+	#网络配置的路径。如果未指定，则使用场景的默认值
 	parser.add_argument("--network", default="", help="Path to the network config. Uses the scene's default if unspecified.")
-
+	#训练前加载此快照。推荐的扩展名:。ingp/。msgpack
 	parser.add_argument("--load_snapshot", "--snapshot", default="", help="Load this snapshot before training. recommended extension: .ingp/.msgpack")
+	#训练后保存此快照。推荐的扩展名:。ingp/。msgpack
 	parser.add_argument("--save_snapshot", default="", help="Save this snapshot after training. recommended extension: .ingp/.msgpack")
-
+	#将参数与原始NeRF匹配。在某些场景中会导致速度变慢和效果变差，但有助于合成场景中的高PSNR
 	parser.add_argument("--nerf_compatibility", action="store_true", help="Matches parameters with original NeRF. Can cause slowness and worse results on some scenes, but helps with high PSNR on synthetic scenes.")
+	#一个nerf风格的路径转换json，我们将从其中计算PSNR
 	parser.add_argument("--test_transforms", default="", help="Path to a nerf style transforms json from which we will compute PSNR.")
+	#为nerf设置训练光线开始时与摄影机的距离。< 0表示使用ngp默认值
 	parser.add_argument("--near_distance", default=-1, type=float, help="Set the distance from the camera at which training rays start for nerf. <0 means use ngp default")
+	#控制图像的亮度。正数增加亮度，负数降低亮度
 	parser.add_argument("--exposure", default=0.0, type=float, help="Controls the brightness of the image. Positive numbers increase brightness, negative numbers decrease it.")
 
+	#用于保存屏幕截图的nerf style transforms.json的路径
 	parser.add_argument("--screenshot_transforms", default="", help="Path to a nerf style transforms.json from which to save screenshots.")
+	#要对哪些帧进行截图
 	parser.add_argument("--screenshot_frames", nargs="*", help="Which frame(s) to take screenshots of.")
+	#截图输出到哪个目录
 	parser.add_argument("--screenshot_dir", default="", help="Which directory to output screenshots to.")
+	#截图中每个像素的样本数
 	parser.add_argument("--screenshot_spp", type=int, default=16, help="Number of samples per pixel in screenshots.")
 
+	#要渲染的相机路径，例如base_cam.json
 	parser.add_argument("--video_camera_path", default="", help="The camera path to render, e.g., base_cam.json.")
+	#对相机轨迹应用额外的平滑，但警告可能无法到达相机路径的端点。
 	parser.add_argument("--video_camera_smoothing", action="store_true", help="Applies additional smoothing to the camera trajectory with the caveat that the endpoint of the camera path may not be reached.")
+	#每秒帧数
 	parser.add_argument("--video_fps", type=int, default=60, help="Number of frames per second.")
+	#渲染的视频应该有多长的秒数
 	parser.add_argument("--video_n_seconds", type=int, default=1, help="Number of seconds the rendered video should be long.")
+	#将输出限制在START_FRAME和END_FRAME之间的帧
 	parser.add_argument("--video_render_range", type=int, nargs=2, default=(-1, -1), metavar=("START_FRAME", "END_FRAME"), help="Limit output to frames between START_FRAME and END_FRAME (inclusive)")
+	#每个像素的样本数。数字越大，噪波越少，但渲染速度越慢
 	parser.add_argument("--video_spp", type=int, default=8, help="Number of samples per pixel. A larger number means less noise, but slower rendering.")
+	#输出视频(video.mp4)或视频帧(video_%%04d.png)的文件名
 	parser.add_argument("--video_output", type=str, default="video.mp4", help="Filename of the output video (video.mp4) or video frames (video_%%04d.png).")
 
+	#从NeRF或SDF模型输出基于行进立方体的网格。支持OBJ和PLY格式
 	parser.add_argument("--save_mesh", default="", help="Output a marching-cubes based mesh from the NeRF or SDF model. Supports OBJ and PLY format.")
+	#设置行进立方体网格的分辨率
 	parser.add_argument("--marching_cubes_res", default=256, type=int, help="Sets the resolution for the marching cubes grid.")
+	#设置行进立方体的密度阈值
 	parser.add_argument("--marching_cubes_density_thresh", default=2.5, type=float, help="Sets the density threshold for marching cubes.")
 
+	#GUI和屏幕截图的分辨率宽度
 	parser.add_argument("--width", "--screenshot_w", type=int, default=0, help="Resolution width of GUI and screenshots.")
+	#GUI和屏幕截图的分辨率高度
 	parser.add_argument("--height", "--screenshot_h", type=int, default=0, help="Resolution height of GUI and screenshots.")
 
+	#交互式运行测试平台GUI
 	parser.add_argument("--gui", action="store_true", help="Run the testbed GUI interactively.")
+	#如果启用了GUI，则控制是否立即开始培训
 	parser.add_argument("--train", action="store_true", help="If the GUI is enabled, controls whether training starts immediately.")
+	#放弃前要训练的步数
 	parser.add_argument("--n_steps", type=int, default=-1, help="Number of steps to train for before quitting.")
+	#打开包含主输出副本的第二个窗口
 	parser.add_argument("--second_window", action="store_true", help="Open a second window containing a copy of the main output.")
+	#渲染到虚拟现实耳机
 	parser.add_argument("--vr", action="store_true", help="Render to a VR headset.")
 
+	#设置应用于NeRF训练图像的锐化量。范围从0.0到1.0
 	parser.add_argument("--sharpen", default=0, help="Set amount of sharpening applied to NeRF training images. Range 0.0 to 1.0.")
 
 
