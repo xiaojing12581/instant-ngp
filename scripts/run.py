@@ -109,12 +109,13 @@ def get_scene(scene):
 
 if __name__ == "__main__":
 	args = parse_args()
-	if args.vr: # VR implies having the GUI running at the moment
+	if args.vr: # VR implies having the GUI running at the moment虚拟现实意味着让图形用户界面正在运行
 		args.gui = True
 
 	if args.mode:
+		#'- mode '参数不再使用。没有效果。模式是根据场景自动选择的
 		print("Warning: the '--mode' argument is no longer in use. It has no effect. The mode is automatically chosen based on the scene.")
-
+		
 	testbed = ngp.Testbed()
 	testbed.root_dir = ROOT_DIR
 
@@ -134,7 +135,7 @@ if __name__ == "__main__":
 		testbed.load_training_data(args.scene)
 
 	if args.gui:
-		# Pick a sensible GUI resolution depending on arguments.
+		# Pick a sensible GUI resolution depending on arguments.根据参数选择合理的GUI分辨率。
 		sw = args.width or 1920
 		sh = args.height or 1080
 		while sw * sh > 1920 * 1080 * 4:
