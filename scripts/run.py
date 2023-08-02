@@ -116,7 +116,7 @@ if __name__ == "__main__":
 		#'- mode '参数不再使用。没有效果。模式是根据场景自动选择的
 		print("Warning: the '--mode' argument is no longer in use. It has no effect. The mode is automatically chosen based on the scene.")
 		
-	testbed = ngp.Testbed()
+	testbed = ngp.Testbed()###############？
 	testbed.root_dir = ROOT_DIR
 
 	for file in args.files:
@@ -143,7 +143,7 @@ if __name__ == "__main__":
 			sh = int(sh / 2)
 		testbed.init_window(sw, sh, second_window=args.second_window)
 		if args.vr:
-			testbed.init_vr()
+			testbed.init_vr()##########################？
 
 
 	if args.load_snapshot:
