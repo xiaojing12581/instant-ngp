@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
 	tqdm_last_update = 0
 	if n_steps > 0:
-		with tqdm(desc="Training", total=n_steps, unit="steps") as t:
+		with tqdm(desc="Training", total=n_steps, unit="steps") as t:#进度条
 			while testbed.frame():
 				if testbed.want_repl():
 					repl(testbed)
@@ -222,19 +222,20 @@ if __name__ == "__main__":
 					else:
 						break
 
-				# Update progress bar
+				# Update progress bar更新进度条
 				if testbed.training_step < old_training_step or old_training_step == 0:
 					old_training_step = 0
 					t.reset()
 
-				now = time.monotonic()
+				now = time.monotonic()#时间模块方法用于获取单调时钟的值
 				if now - tqdm_last_update > 0.1:
-					t.update(testbed.training_step - old_training_step)
-					t.set_postfix(loss=testbed.loss)
+					t.update(testbed.training_step - old_training_step)#对进度条进行手动更新
+					t.set_postfix(loss=testbed.loss)#设置显示在进度条后边的内容
 					old_training_step = testbed.training_step
 					tqdm_last_update = now
 
 	if args.save_snapshot:
+		#os.path.dirname(path)去掉文件名，返回目录
 		os.makedirs(os.path.dirname(args.save_snapshot), exist_ok=True)
 		testbed.save_snapshot(args.save_snapshot, False)
 
@@ -250,11 +251,11 @@ if __name__ == "__main__":
 		minpsnr = 1000
 		maxpsnr = 0
 
-		# Evaluate metrics on black background
+		# Evaluate metrics on black background评估黑色背景下的指标
 		testbed.background_color = [0.0, 0.0, 0.0, 1.0]
 
-		# Prior nerf papers don't typically do multi-sample anti aliasing.
-		# So snap all pixels to the pixel centers.
+		# Prior nerf papers don't typically do multi-sample anti aliasing.先前的nerf论文通常不进行多样本反走样。
+		# So snap all pixels to the pixel centers.因此，将所有像素对齐像素中心。
 		testbed.snap_to_pixel_centers = True
 		spp = 8
 
@@ -276,11 +277,11 @@ if __name__ == "__main__":
 					write_image(f"ref.png", ref_image)
 					write_image(f"out.png", image)
 
-					diffimg = np.absolute(image - ref_image)
+					diffimg = np.absolute(image - ref_image)#对数组中的每一个元素求其绝对值。np.abs是这个函数的简写。
 					diffimg[...,3:4] = 1.0
 					write_image("diff.png", diffimg)
 
-				A = np.clip(linear_to_srgb(image[...,:3]), 0.0, 1.0)
+				A = np.clip(linear_to_srgb(image[...,:3]), 0.0, 1.0)#将数组中的元素限制在某个范围内
 				R = np.clip(linear_to_srgb(ref_image[...,:3]), 0.0, 1.0)
 				mse = float(compute_error("MSE", A, R))
 				ssim = float(compute_error("SSIM", A, R))
@@ -348,10 +349,10 @@ if __name__ == "__main__":
 			testbed.camera_smoothing = args.video_camera_smoothing
 
 			if start_frame >= 0 and i < start_frame:
-				# For camera smoothing and motion blur to work, we cannot just start rendering
-				# from middle of the sequence. Instead we render a very small image and discard it
+				# For camera smoothing and motion blur to work, we cannot just start rendering对于相机平滑和运动模糊的工作，我们不能只是从序列的中间开始渲染。
+				# from middle of the sequence. Instead we render a very small image and discard it相反，我们渲染一个非常小的图像，并为这些初始帧丢弃它。
 				# for these initial frames.
-				# TODO Replace this with a no-op render method once it's available
+				# TODO Replace this with a no-op render method once it's available.TODO在无操作呈现方法可用时将其替换
 				frame = testbed.render(32, 32, 1, True, float(i)/n_frames, float(i + 1)/n_frames, args.video_fps, shutter_fraction=0.5)
 				continue
 			elif end_frame >= 0 and i > end_frame:
