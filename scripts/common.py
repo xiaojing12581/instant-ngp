@@ -9,26 +9,33 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
 import code
+#获取需求文件夹或文件路径列表
 import glob
+#读取和写入图像数据
 import imageio
 import numpy as np
 import os
+#PurePosixPath用于操作UNIX（包括Mac OSX）风格的路径，Path代表访问实际文件系统的真正路径
 from pathlib import Path, PurePosixPath
+#沿给定轴计算一维卷积，沿给定轴的阵列线与给定权重进行卷积
 from scipy.ndimage.filters import convolve1d
+#解决str和其他二进制数据类型的转换
 import struct
 import sys
 
 import flip
 import flip.utils
-
+#path.resolve（）把一个路径或路径片段的序列解析为一个绝对路径，__file__表示当前的common.py文件，resolve()文件的绝对路径，parent.parent向上两层父级目录
 PAPER_FOLDER = Path(__file__).resolve().parent.parent
 SUPPL_FOLDER = PAPER_FOLDER/"supplemental"
 SCRIPTS_FOLDER = PAPER_FOLDER/"scripts"
 TEMPLATE_FOLDER = SCRIPTS_FOLDER/"template"
 DATA_FOLDER = SCRIPTS_FOLDER/"data"
 
+#os.path.realpath（）获得该方法所在脚本（.py文件）的路径
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 RESULTS_DIR = os.path.join(ROOT_DIR, "results")
+#os.environ.get（）：os.environ（获取有关系统的各种信息）是一个字典，是环境变量的字典，可以通过get获取键对应的值
 NGP_DATA_FOLDER = os.environ.get("NGP_DATA_FOLDER") or os.path.join(ROOT_DIR, "data")
 
 
@@ -37,61 +44,65 @@ SDF_DATA_FOLDER = os.path.join(NGP_DATA_FOLDER, "sdf")
 IMAGE_DATA_FOLDER = os.path.join(NGP_DATA_FOLDER, "image")
 VOLUME_DATA_FOLDER = os.path.join(NGP_DATA_FOLDER, "volume")
 
-# Search for pyngp in the build folder.
+# Search for pyngp in the build folder.在构建文件夹中搜索pyngp。
+#glob模块实现对目录内容进行匹配，结合通配符号*，？，[]，使用。*可以匹配零个或多个符号，？可以匹配单个字符，[]可以匹配一个指定范围的字符
+#glob.glob（）函数接收通配模式做为输入，并返回所有匹配的文件名和路径名列表
+#glob.iglob()获取一个可遍历对象，使用它可以逐个获取匹配的文件路径名，参数（文件名，recursive代表递归调用）
 sys.path += [os.path.dirname(pyd) for pyd in glob.iglob(os.path.join(ROOT_DIR, "build*", "**/*.pyd"), recursive=True)]
 sys.path += [os.path.dirname(pyd) for pyd in glob.iglob(os.path.join(ROOT_DIR, "build*", "**/*.so"), recursive=True)]
 
 def repl(testbed):
 	print("-------------------\npress Ctrl-Z to return to gui\n---------------------------")
+	#按Ctrl-Z返回gui，交互式控制台
 	code.InteractiveConsole(locals=locals()).interact()
 	print("------- returning to gui...")
 
 def mse2psnr(x): return -10.*np.log(x)/np.log(10.)
 
 def sanitize_path(path):
-	return str(PurePosixPath(path.relative_to(PAPER_FOLDER)))
+	return str(PurePosixPath(path.relative_to(PAPER_FOLDER)))#path.relative_to计算相对路径
 
 # from https://stackoverflow.com/questions/31638651/how-can-i-draw-lines-into-numpy-arrays
 def trapez(y,y0,w):
 	return np.clip(np.minimum(y+1+w/2-y0, -y+1+w/2+y0),0,1)
 
 def weighted_line(r0, c0, r1, c1, w, rmin=0, rmax=np.inf):
-	# The algorithm below works fine if c1 >= c0 and c1-c0 >= abs(r1-r0).
-	# If either of these cases are violated, do some switches.
+	# The algorithm below works fine if c1 >= c0 and c1-c0 >= abs(r1-r0).如果c1 >= c0且c1-c0 >= abs(r1-r0)，则下面的算法工作正常。
+	# If either of these cases are violated, do some switches.如果违反了这两种情况中的任何一种，请进行一些切换。
 	if abs(c1-c0) < abs(r1-r0):
-		# Switch x and y, and switch again when returning.
+		# Switch x and y, and switch again when returning.切换x和y，返回时再次切换。
 		xx, yy, val = weighted_line(c0, r0, c1, r1, w, rmin=rmin, rmax=rmax)
 		return (yy, xx, val)
 
-	# At this point we know that the distance in columns (x) is greater
-	# than that in rows (y). Possibly one more switch if c0 > c1.
+	# At this point we know that the distance in columns (x) is greater此时，我们知道列(x)中的距离大于行(y)中的距离。
+	# than that in rows (y). Possibly one more switch if c0 > c1.如果c0 > c1，可能还有一个开关。
 	if c0 > c1:
 		return weighted_line(r1, c1, r0, c0, w, rmin=rmin, rmax=rmax)
 
-	# The following is now always < 1 in abs
+	# The following is now always < 1 in abs在abs中，以下值现在总是< 1
 	slope = (r1-r0) / (c1-c0)
 
-	# Adjust weight by the slope
+	# Adjust weight by the slope根据坡度调整重量
 	w *= np.sqrt(1+np.abs(slope)) / 2
 
-	# We write y as a function of x, because the slope is always <= 1
+	# We write y as a function of x, because the slope is always <= 1我们把y写成x的函数，因为斜率总是< = 1
 	# (in absolute value)
 	x = np.arange(c0, c1+1, dtype=float)
 	y = x * slope + (c1*r0-c0*r1) / (c1-c0)
 
-	# Now instead of 2 values for y, we have 2*np.ceil(w/2).
-	# All values are 1 except the upmost and bottommost.
+	# Now instead of 2 values for y, we have 2*np.ceil(w/2).现在，我们用2*np.ceil(w/2)代替了y的2个值。
+	# All values are 1 except the upmost and bottommost.除了最上面和最下面，所有值都是1。
 	thickness = np.ceil(w/2)
 	yy = (np.floor(y).reshape(-1,1) + np.arange(-thickness-1,thickness+2).reshape(1,-1))
 	xx = np.repeat(x, yy.shape[1])
-	vals = trapez(yy, y.reshape(-1,1), w).flatten()
+	vals = trapez(yy, y.reshape(-1,1), w).flatten()#flatten()降维，例如（2，3，4）维——>2*3*4维
 
 	yy = yy.flatten()
 
-	# Exclude useless parts and those outside of the interval
+	# Exclude useless parts and those outside of the interval排除无用部分和间隔之外的部分，以避免图片之外的部分
 	# to avoid parts outside of the picture
-	mask = np.logical_and.reduce((yy >= rmin, yy < rmax, vals > 0))
-
+	mask = np.logical_and.reduce((yy >= rmin, yy < rmax, vals > 0))#将一个数组中的元素逻辑与操作后得到一个结果
+	#np.logical_and(x1,x2)两个布尔型数组逻辑与返回布尔型数组
 	return (yy[mask].astype(int), xx[mask].astype(int), vals[mask])
 
 def diagonally_truncated_mask(shape, x_threshold, angle):
