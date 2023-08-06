@@ -49,7 +49,7 @@ def color_space_transform(input_color, fromSpace2toSpace):
 
     elif fromSpace2toSpace == "linrgb2xyz" or fromSpace2toSpace == "xyz2linrgb":
         # Source: https://www.image-engineering.de/library/technotes/958-how-to-convert-between-srgb-and-ciexyz
-        # Assumes D65 standard illuminant
+        # Assumes D65 standard illuminant假设D65标准光源
         a11 = 10135552 / 24577794
         a12 = 8788810  / 24577794
         a13 = 4435075  / 24577794
@@ -63,10 +63,10 @@ def color_space_transform(input_color, fromSpace2toSpace):
                         [a21, a22, a23],
                         [a31, a32, a33]])
 
-        input_color = np.transpose(input_color, (2, 0, 1)) # C(H*W)
+        input_color = np.transpose(input_color, (2, 0, 1)) # C(H*W)#根据维度索引决定，调换数组的行列值的索引值，类似于求转置
         if fromSpace2toSpace == "xyz2linrgb":
-            A = np.linalg.inv(A)
-        transformed_color = np.matmul(A, input_color)
+            A = np.linalg.inv(A)#矩阵求逆
+        transformed_color = np.matmul(A, input_color)#两个数组的矩阵相乘
         transformed_color = np.transpose(transformed_color, (1, 2, 0))
 
     elif fromSpace2toSpace == "xyz2ycxcz":
@@ -75,7 +75,7 @@ def color_space_transform(input_color, fromSpace2toSpace):
         y = 116 * input_color[1:2, :, :] - 16
         cx = 500 * (input_color[0:1, :, :] - input_color[1:2, :, :])
         cz = 200 * (input_color[1:2, :, :] - input_color[2:3, :, :])
-        transformed_color = np.concatenate((y, cx, cz), 0)
+        transformed_color = np.concatenate((y, cx, cz), 0)#一次完成多个数组的拼接
 
     elif fromSpace2toSpace == "ycxcz2xyz":
         y = (input_color[0:1, :, :] + 16) / 116
@@ -155,16 +155,16 @@ def generate_spatial_filter(pixels_per_degree, channel):
     a1_A = 1 
     b1_A = 0.0047
     a2_A = 0
-    b2_A = 1e-5 # avoid division by 0
+    b2_A = 1e-5 # avoid division by 0避免被0除
     a1_rg = 1
     b1_rg = 0.0053
     a2_rg = 0
-    b2_rg = 1e-5 # avoid division by 0
+    b2_rg = 1e-5 # avoid division by 0避免被0除
     a1_by = 34.1
     b1_by = 0.04
     a2_by = 13.5
     b2_by = 0.025
-    if channel == "A": #Achromatic CSF
+    if channel == "A": #Achromatic CSF消色差的
         a1 = a1_A
         b1 = b1_A
         a2 = a2_A
@@ -180,49 +180,52 @@ def generate_spatial_filter(pixels_per_degree, channel):
         a2 = a2_by
         b2 = b2_by
 
-    # Determine evaluation domain
+    # Determine evaluation domain确定评估域
     max_scale_parameter = max([b1_A, b2_A, b1_rg, b2_rg, b1_by, b2_by])
+	#np.ceil计算大于等于该值的最小整数，向上取整
     r = np.ceil(3 * np.sqrt(max_scale_parameter / (2 * np.pi**2)) * pixels_per_degree)
     r = int(r)
     deltaX = 1.0 / pixels_per_degree
-    x, y = np.meshgrid(range(-r, r + 1), range(-r, r + 1))
+    x, y = np.meshgrid(range(-r, r + 1), range(-r, r + 1))#生成网格点坐标矩阵
     z = (x * deltaX)**2 + (y * deltaX)**2
     
-    # Generate weights
+    # Generate weights生成权重
     g = a1 * np.sqrt(np.pi / b1) * np.exp(-np.pi**2 * z / b1) + a2 * np.sqrt(np.pi / b2) * np.exp(-np.pi**2 * z / b2)
     g = g / np.sum(g)
 
     return g, r
 
 def spatial_filter(img, s_a, s_rg, s_by, radius):
-    # Filters image img using Contrast Sensitivity Functions.
-    # Returns linear RGB
+    # Filters image img using Contrast Sensitivity Functions.使用对比敏感度函数过滤图像img。
+    # Returns linear RGB返回线性RGB
 
     dim = img.shape
-    # Prepare convolution input
+    # Prepare convolution input准备卷积输入
+	#np.pad在数组的边缘填充值，参数array要填充的数组，pad_width每个轴边缘需要填充的数值数目；mode填充方式
     img_pad_a = np.pad(img[0:1, :, :], ((0, 0), (radius, radius), (radius, radius)), mode='edge')
     img_pad_rg = np.pad(img[1:2, :, :], ((0, 0), (radius, radius), (radius, radius)), mode='edge')
     img_pad_by = np.pad(img[2:3, :, :], ((0, 0), (radius, radius), (radius, radius)), mode='edge')
 
-    # Apply Gaussian filters
+    # Apply Gaussian filters应用高斯过滤器
     img_tilde_opponent = np.zeros((dim[0], dim[1], dim[2]))
+	#np.squeeze从数组的形状中删除单维度条目，即把shape中为1的维度去掉
     img_tilde_opponent[0:1, :, :] = signal.convolve2d(img_pad_a.squeeze(0), s_a, mode='valid')
     img_tilde_opponent[1:2, :, :] = signal.convolve2d(img_pad_rg.squeeze(0), s_rg, mode='valid')
     img_tilde_opponent[2:3, :, :] = signal.convolve2d(img_pad_by.squeeze(0), s_by, mode='valid')
 
-    # Transform to linear RGB for clamp
+    # Transform to linear RGB for clamp转换为线性RGB用于clamp
     img_tilde_linear_rgb = color_space_transform(img_tilde_opponent, 'ycxcz2linrgb')
     
     # Clamp to RGB box
     return np.clip(img_tilde_linear_rgb, 0.0, 1.0)
 
 def hunt_adjustment(img):
-    # Applies Hunt adjustment to L*a*b* image img
+    # Applies Hunt adjustment to L*a*b* image img对L*a*b*图像img应用寻线调整
     
-    # Extract luminance component
+    # Extract luminance component提取亮度分量
     L = img[0:1, :, :]
     
-    # Apply Hunt adjustment
+    # Apply Hunt adjustment应用寻线调整
     img_h = np.zeros(img.shape)
     img_h[0:1, :, :] = L
     img_h[1:2, :, :] = np.multiply((0.01 * L), img[1:2, :, :])
@@ -231,18 +234,18 @@ def hunt_adjustment(img):
     return img_h
 
 def hyab(reference, test):
-    # Computes HyAB distance between L*a*b* images reference and test
+    # Computes HyAB distance between L*a*b* images reference and test计算L*a*b*图像参考和测试之间的HyAB距离
     delta = reference - test
-    return abs(delta[0:1, :, :]) + np.linalg.norm(delta[1:3, :, :], axis=0)
+    return abs(delta[0:1, :, :]) + np.linalg.norm(delta[1:3, :, :], axis=0)#求范数
 
-def redistribute_errors(power_deltaE_hyab, cmax):
-    # Set redistribution parameters
+def redistribute_errors(power_deltaE_hyab, cmax):#重新分配
+    # Set redistribution parameters设置重新分发参数
     pc = 0.4
     pt = 0.95
     
-    # Re-map error to 0-1 range. Values between 0 and
-    # pccmax are mapped to the range [0, pt],
-    # while the rest are mapped to the range (pt, 1]
+    # Re-map error to 0-1 range. Values between 0 and将误差重新映射到0-1范围。
+    # pccmax are mapped to the range [0, pt],0和pccmax之间的值映射到范围[0，pt]，
+    # while the rest are mapped to the range (pt, 1]而其余的值映射到范围(pt，1)
     deltaE_c = np.zeros(power_deltaE_hyab.shape)
     pccmax = pc * cmax
     deltaE_c = np.where(power_deltaE_hyab < pccmax, (pt / pccmax) * power_deltaE_hyab, pt + ((power_deltaE_hyab - pccmax) / (cmax - pccmax)) * (1.0 - pt))
@@ -250,52 +253,52 @@ def redistribute_errors(power_deltaE_hyab, cmax):
     return deltaE_c
 
 def feature_detection(imgy, pixels_per_degree, feature_type):
-    # Finds features of type feature_type in image img based on current PPD
+    # Finds features of type feature_type in image img based on current PPD根据当前PPD在图像img中查找feature_type类型的特征
     
-    # Set peak to trough value (2x standard deviations) of human edge
-    # detection filter
+    # Set peak to trough value (2x standard deviations) of human edge设置人体边缘的峰谷值(2倍标准差)
+    # detection filter检测过滤器
     w = 0.082
     
-    # Compute filter radius
+    # Compute filter radius计算过滤器半径
     sd = 0.5 * w * pixels_per_degree
     radius = int(np.ceil(3 * sd))
 
-    # Compute 2D Gaussian
+    # Compute 2D Gaussian计算2D高斯
     [x, y] = np.meshgrid(range(-radius, radius+1), range(-radius, radius+1))
     g = np.exp(-(x ** 2 + y ** 2) / (2 * sd * sd))
     
     if feature_type == 'edge': # Edge detector
-        # Compute partial derivative in x-direction
+        # Compute partial derivative in x-direction计算x方向的偏导数
         Gx = np.multiply(-x, g)
-    else: # Point detector
-        # Compute second partial derivative in x-direction
+    else: # Point detector点探测器
+        # Compute second partial derivative in x-direction计算x方向的二阶偏导数
         Gx = np.multiply(x ** 2 / (sd * sd) - 1, g)
  
-    # Normalize positive weights to sum to 1 and negative weights to sum to -1
+    # Normalize positive weights to sum to 1 and negative weights to sum to -1将正权重归一化为1，将负权重归一化为-1
     negative_weights_sum = -np.sum(Gx[Gx < 0])
     positive_weights_sum = np.sum(Gx[Gx > 0])
     Gx = np.where(Gx < 0, Gx / negative_weights_sum, Gx / positive_weights_sum)
     
-    # Detect features
+    # Detect features检测特征
     imgy_pad = np.pad(imgy, ((0, 0), (radius, radius), (radius, radius)), mode='edge').squeeze(0)
     featuresX = signal.convolve2d(imgy_pad, Gx, mode='valid')
     featuresY = signal.convolve2d(imgy_pad, np.transpose(Gx), mode='valid')
 
-    return np.stack((featuresX, featuresY))
+    return np.stack((featuresX, featuresY))#将数组沿指定方向堆叠
 
 def compute_flip(reference, test, pixels_per_degree):
     assert reference.shape == test.shape
 
-    # Set color and feature exponents
+    # Set color and feature exponents设置颜色和特征指数
     qc = 0.7
     qf = 0.5
 
-    # Transform reference and test to opponent color space
+    # Transform reference and test to opponent color space将参考和测试转换到对手颜色空间
     reference = color_space_transform(reference, 'srgb2ycxcz')
     test = color_space_transform(test, 'srgb2ycxcz')
 
-    # --- Color pipeline ---
-    # Spatial filtering
+    # --- Color pipeline ---彩色管道
+    # Spatial filtering空间滤波
     s_a, radius_a = generate_spatial_filter(pixels_per_degree, 'A')
     s_rg, radius_rg = generate_spatial_filter(pixels_per_degree, 'RG')
     s_by, radius_by = generate_spatial_filter(pixels_per_degree, 'BY')
@@ -303,7 +306,7 @@ def compute_flip(reference, test, pixels_per_degree):
     filtered_reference = spatial_filter(reference, s_a, s_rg, s_by, radius)
     filtered_test = spatial_filter(test, s_a, s_rg, s_by, radius)
 
-    # Perceptually Uniform Color Space
+    # Perceptually Uniform Color Space感知均匀颜色空间
     preprocessed_reference = hunt_adjustment(color_space_transform(filtered_reference, 'linrgb2lab'))
     preprocessed_test = hunt_adjustment(color_space_transform(filtered_test, 'linrgb2lab'))
 
