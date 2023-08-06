@@ -105,7 +105,7 @@ def weighted_line(r0, c0, r1, c1, w, rmin=0, rmax=np.inf):
 	#np.logical_and(x1,x2)两个布尔型数组逻辑与返回布尔型数组
 	return (yy[mask].astype(int), xx[mask].astype(int), vals[mask])
 
-def diagonally_truncated_mask(shape, x_threshold, angle):
+def diagonally_truncated_mask(shape, x_threshold, angle):#对角线_截断_掩码
 	result = np.zeros(shape, dtype=bool)
 	for x in range(shape[1]):
 		for y in range(shape[0]):
@@ -113,7 +113,7 @@ def diagonally_truncated_mask(shape, x_threshold, angle):
 			result[y, x, ...] = x < thres
 	return result
 
-def diagonally_combine_two_images(img1, img2, x_threshold, angle, gap=0, color=1):
+def diagonally_combine_two_images(img1, img2, x_threshold, angle, gap=0, color=1):#对角组合两幅图像
 	if img2.shape != img1.shape:
 		raise ValueError(f"img1 and img2 must have the same shape; {img1.shape} vs {img2.shape}")
 	mask = diagonally_truncated_mask(img1.shape, x_threshold, angle)
@@ -121,59 +121,64 @@ def diagonally_combine_two_images(img1, img2, x_threshold, angle, gap=0, color=1
 	result[mask] = img1[mask]
 	if gap > 0:
 		rr, cc, val = weighted_line(0, int(x_threshold * img1.shape[1] - (angle * img1.shape[0] / 2)), img1.shape[0]-1, int(x_threshold * img1.shape[1] + (angle * img1.shape[0] / 2)), gap)
-		result[rr, cc, :] = result[rr, cc, :] * (1 - val[...,np.newaxis]) + val[...,np.newaxis] * color
+		result[rr, cc, :] = result[rr, cc, :] * (1 - val[...,np.newaxis]) + val[...,np.newaxis] * color#np.newaxis插入新维度，且扩张的那一维的长度是1
 	return result
 
-def diagonally_combine_images(images, x_thresholds, angle, gap=0, color=1):
+def diagonally_combine_images(images, x_thresholds, angle, gap=0, color=1):#对角组合图像
 	result = images[0]
 	for img, thres in zip(images[1:], x_thresholds):
 		result = diagonally_combine_two_images(result, img, thres, angle, gap, color)
 	return result
 
-def write_image_imageio(img_file, img, quality):
-	img = (np.clip(img, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)
+def write_image_imageio(img_file, img, quality):#写图像
+	img = (np.clip(img, 0.0, 1.0) * 255.0 + 0.5).astype(np.uint8)#图像存储类型
 	kwargs = {}
 	if os.path.splitext(img_file)[1].lower() in [".jpg", ".jpeg"]:
 		if img.ndim >= 3 and img.shape[2] > 3:
 			img = img[:,:,:3]
 		kwargs["quality"] = quality
 		kwargs["subsampling"] = 0
-	imageio.imwrite(img_file, img, **kwargs)
+	imageio.imwrite(img_file, img, **kwargs)#（要存储的路径，要保存的图片）保存图片到特定路径
 
-def read_image_imageio(img_file):
+def read_image_imageio(img_file):#读图像
 	img = imageio.imread(img_file)
-	img = np.asarray(img).astype(np.float32)
+	img = np.asarray(img).astype(np.float32)#将数据结构转化为ndarray
 	if len(img.shape) == 2:
 		img = img[:,:,np.newaxis]
 	return img / 255.0
 
 def srgb_to_linear(img):
 	limit = 0.04045
-	return np.where(img > limit, np.power((img + 0.055) / 1.055, 2.4), img / 12.92)
+	return np.where(img > limit, np.power((img + 0.055) / 1.055, 2.4), img / 12.92)#满足条件，输出前一个，不满足输出后一个
 
 def linear_to_srgb(img):
 	limit = 0.0031308
+	#np.where满足条件输出前一个，不满足输出后一个
 	return np.where(img > limit, 1.055 * (img ** (1.0 / 2.4)) - 0.055, 12.92 * img)
 
 def read_image(file):
 	if os.path.splitext(file)[1] == ".bin":
-		with open(file, "rb") as f:
-			bytes = f.read()
-			h, w = struct.unpack("ii", bytes[:8])
+		with open(file, "rb") as f:#以二进制打开一个文件用于读取
+			bytes = f.read()#将文件数据做为字符串返回
+			#struct.pack(fmt,v1,v2...)将v1，v2等参数的值进行一层包装，包装的方法由fmt指定，被包装的参数必须严格符合fmt，最后返回一个包装后的字符串
+			h, w = struct.unpack("ii", bytes[:8])#解包，返回一个由解包数据得到的一个元组
+			#np.frombuffer将data以流的形式读入转化维ndarray对象。参数buffer缓冲区表示暴露缓冲区接口的对象
+			#dtype代表返回的数据类型数组的数据类型；count代表返回ndarray的长度；offset偏移量，代表读取的起始位置
 			img = np.frombuffer(bytes, dtype=np.float16, count=h*w*4, offset=8).astype(np.float32).reshape([h, w, 4])
 	else:
 		img = read_image_imageio(file)
 		if img.shape[2] == 4:
 			img[...,0:3] = srgb_to_linear(img[...,0:3])
-			# Premultiply alpha
+			# Premultiply alpha预乘α
 			img[...,0:3] *= img[...,3:4]
 		else:
 			img = srgb_to_linear(img)
 	return img
 
-def write_image(file, img, quality=95):
+def write_image(file, img, quality=95):#写入图像
 	if os.path.splitext(file)[1] == ".bin":
 		if img.shape[2] < 4:
+			#np.dstack将列表中的数组沿深度方向进行拼接
 			img = np.dstack((img, np.ones([img.shape[0], img.shape[1], 4 - img.shape[2]])))
 		with open(file, "wb") as f:
 			f.write(struct.pack("ii", img.shape[0], img.shape[1]))
@@ -181,20 +186,21 @@ def write_image(file, img, quality=95):
 	else:
 		if img.shape[2] == 4:
 			img = np.copy(img)
-			# Unmultiply alpha
+			# Unmultiply alpha取消阿尔法乘法
+			#np.divide数组对应位置元素做除法，参数1充当被除数的数组，参数2充当除数的数组，out计算结果存放的位置，where数组型变量默认即可
 			img[...,0:3] = np.divide(img[...,0:3], img[...,3:4], out=np.zeros_like(img[...,0:3]), where=img[...,3:4] != 0)
 			img[...,0:3] = linear_to_srgb(img[...,0:3])
 		else:
 			img = linear_to_srgb(img)
 		write_image_imageio(file, img, quality)
 
-def trim(error, skip=0.000001):
+def trim(error, skip=0.000001):#整齐
 	error = np.sort(error.flatten())
 	size = error.size
 	skip = int(skip * size)
 	return error[skip:size-skip].mean()
 
-def luminance(a):
+def luminance(a):#亮度
 	return 0.2126 * a[:,:,0] + 0.7152 * a[:,:,1] + 0.0722 * a[:,:,2]
 
 def SSIM(a, b):
