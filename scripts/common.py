@@ -204,7 +204,7 @@ def luminance(a):#亮度
 	return 0.2126 * a[:,:,0] + 0.7152 * a[:,:,1] + 0.0722 * a[:,:,2]
 
 def SSIM(a, b):
-	def blur(a):
+	def blur(a):#虚化
 		k = np.array([0.120078, 0.233881, 0.292082, 0.233881, 0.120078])
 		x = convolve1d(a, k, axis=0)
 		return convolve1d(x, k, axis=1)
@@ -241,7 +241,7 @@ def rgb_mean(img):
 	return np.mean(img, axis=2)
 
 def compute_error_img(metric, img, ref):
-	img[np.logical_not(np.isfinite(img))] = 0
+	img[np.logical_not(np.isfinite(img))] = 0#np.isfinite逐元素测试有效性（不是无穷大，也不是非数字）结果以布尔数组的形式返回
 	img = np.maximum(img, 0.)
 	if metric == "MAE":
 		return L1(img, ref)
@@ -262,11 +262,11 @@ def compute_error_img(metric, img, ref):
 	elif metric == "SSIM":
 		return SSIM(np.clip(img, 0.0, 1.0), np.clip(ref, 0.0, 1.0))
 	elif metric in ["FLIP", "\FLIP"]:
-		# Set viewing conditions
+		# Set viewing conditions设置查看条件
 		monitor_distance = 0.7
 		monitor_width = 0.7
 		monitor_resolution_x = 3840
-		# Compute number of pixels per degree of visual angle
+		# Compute number of pixels per degree of visual angle计算每度视角的像素数
 		pixels_per_degree = monitor_distance * (monitor_resolution_x / monitor_width) * (np.pi / 180)
 
 		ref_srgb = np.clip(flip.color_space_transform(ref, "linrgb2srgb"), 0, 1)
