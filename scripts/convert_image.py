@@ -15,6 +15,7 @@ import os
 import PIL
 
 def parse_args():
+	#将图像转换成不同的格式。默认情况下，转换为我们的二进制fp16 '。“bin”格式，有助于快速加载大图像
 	parser = argparse.ArgumentParser(description="Convert image into a different format. By default, converts to our binary fp16 '.bin' format, which helps quickly load large images.")
 	parser.add_argument("--input", default="", help="Path to the image to convert.")
 	parser.add_argument("--output", default="", help="Path to the output. Defaults to <input>.bin")
