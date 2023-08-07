@@ -19,16 +19,17 @@ import cv2
 import glob
 
 def parse_args():
+	#将数据集从nsvf纸张格式转换为nerf格式transforms.json
 	parser = argparse.ArgumentParser(description="convert a dataset from the nsvf paper format to nerf format transforms.json")
-
-	parser.add_argument("--aabb_scale", default=1, help="large scene scale factor")
-	parser.add_argument("--white_transparent", action="store_true", help="White is transparent")
-	parser.add_argument("--black_transparent", action="store_true", help="White is transparent")
+	
+	parser.add_argument("--aabb_scale", default=1, help="large scene scale factor")#大场景比例因子
+	parser.add_argument("--white_transparent", action="store_true", help="White is transparent")#白色是透明的
+	parser.add_argument("--black_transparent", action="store_true", help="White is transparent")#白色是透明的
 	args = parser.parse_args()
 	return args
 
-def variance_of_laplacian(image):
-	return cv2.Laplacian(image, cv2.CV_64F).var()
+def variance_of_laplacian(image):#拉普拉斯方差
+	return cv2.Laplacian(image, cv2.CV_64F).var()#计算图像的拉普拉斯算子，通过计算图像像素的二阶导数提取图像中的边缘，纹理等特征
 
 def sharpness(imagePath):
 	image = cv2.imread(imagePath)
@@ -45,8 +46,8 @@ if __name__ == "__main__":
 	img_files[0] = sorted(glob.glob(os.path.join(IMAGE_FOLDER, "rgb", f"0_*.png")))
 	img_files[1] = sorted(glob.glob(os.path.join(IMAGE_FOLDER, "rgb", f"1_*.png")))
 	img_files[2] = sorted(glob.glob(os.path.join(IMAGE_FOLDER, "rgb", f"2_*.png")))
-	xx = open("bbox.txt").readline().strip().split(" ")
-	xx = [x for x in xx if x] # remove empty elements
+	xx = open("bbox.txt").readline().strip().split(" ")#strip()移除字符串头尾指定的字符
+	xx = [x for x in xx if x] # remove empty elements除空元素
 	bbox = tuple(map(float,xx))
 
 	image = cv2.imread(img_files[0][0],cv2.IMREAD_UNCHANGED)
@@ -55,22 +56,22 @@ if __name__ == "__main__":
 	if (image.shape[2] == 3 or (image.shape[2] == 4 and image[0][0][3] != 0)):
 		x = w-1
 		if (image[0][0][0] == 0 and image[0][0][1] == 0 and image[0][0][2] == 0):
-			print("black opaque background detected")
+			print("black opaque background detected")#检测到黑色不透明背景
 			args.black_transparent=True
 		elif (image[0][0][0] == 255 and image[0][0][1] == 255 and image[0][0][2] == 255):
-			print("white opaque background detected")
+			print("white opaque background detected")#检测到白色不透明背景
 			args.white_transparent=True
 		elif (image[0][x][0] == 0 and image[0][x][1] == 0 and image[0][x][2] == 0):
-			print("black opaque background detected")
+			print("black opaque background detected")#检测到黑色不透明背景
 			args.black_transparent=True
 		elif (image[0][x][0] == 255 and image[0][x][1] == 255 and image[0][x][2] == 255):
-			print("white opaque background detected")
+			print("white opaque background detected")#检测到白色不透明背景
 			args.white_transparent=True
 		else:
-			print("cant detect background")
+			print("cant detect background")#无法检测背景
 			exit()
 	elif (image.shape[2] == 4):
-		print("transparent alpha channel detected, first pixel alpha = ", image[0][0][3])
+		print("transparent alpha channel detected, first pixel alpha = ", image[0][0][3])#检测到透明alpha通道，第一个像素alpha =
 
 	lines = map(str.strip,open("intrinsics.txt","r").readlines())
 	els = tuple(map(float, " ".join(lines).split(" ")))
@@ -87,7 +88,7 @@ if __name__ == "__main__":
 		cx = els[2]
 		cy = els[6]
 	else:
-		print("dont understand intrinsics file", els)
+		print("dont understand intrinsics file", els)#不理解内部文件
 		exit()
 	# fl = 0.5 * w / tan(0.5 * angle_x);
 	angle_x = math.atan(w/(fl_x*2))*2
@@ -143,10 +144,10 @@ if __name__ == "__main__":
 			c2w[0:3,3] -= centroid
 			c2w[0:3,3] *= scale
 			#print(name,c2w)
-			c2w[0:3,2] *= -1 # flip the y and z axis
+			c2w[0:3,2] *= -1 # flip the y and z axis翻转y和z轴
 			c2w[0:3,1] *= -1
-			c2w = c2w[[0,2,1,3],:] # swap y and z 012 201 102
-			c2w[2,:] *= -1 # flip whole world upside down
+			c2w = c2w[[0,2,1,3],:] # swap y and z 012 201 102交换y和z 012 201 102
+			c2w[2,:] *= -1 # flip whole world upside down颠覆整个世界
 
 			frame = {"file_path": name, "sharpness": b, "transform_matrix": c2w}
 			out["frames"].append(frame)
