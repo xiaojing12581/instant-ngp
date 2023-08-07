@@ -39,22 +39,22 @@ from flip import compute_flip
 from utils import *
 
 if __name__ == '__main__':
-	# Set viewing conditions
+	# Set viewing conditions设置查看条件
 	monitor_distance = 0.7
 	monitor_width = 0.7
 	monitor_resolution_x = 3840
 	
-	# Compute number of pixels per degree of visual angle
+	# Compute number of pixels per degree of visual angle计算每度视角的像素数
 	pixels_per_degree = monitor_distance * (monitor_resolution_x / monitor_width) * (np.pi / 180)
 	
-	# Load sRGB images
+	# Load sRGB images加载sRGB图像
 	reference = load_image_array('../images/reference.png')
 	test = load_image_array('../images/test.png')
 
-	# Compute FLIP map
+	# Compute FLIP map计算翻转图
 	deltaE = compute_flip(reference, test, pixels_per_degree)
 
-	# Save error map
+	# Save error map保存误差图
 	index_map = np.floor(255.0 * deltaE.squeeze(0))
 
 	use_color_map = True
