@@ -22,10 +22,15 @@ import pyngp as ngp  # noqa
 
 def parse_args():
 	parser = argparse.ArgumentParser()
+	#将图像直接流式传输到InstantNGP
 	parser.add_argument("--stream", action="store_true", help="Stream images directly to InstantNGP.")
+	#保存数据集之前的帧数。也用作流式传输时要记住的摄像机数量
 	parser.add_argument("--n_frames", default=10, type=int, help="Number of frames before saving the dataset. Also used as the number of cameras to remember when streaming.")
+	#保存数据集的路径
 	parser.add_argument("--save_path", required='--stream' not in sys.argv, type=str, help="Path to save the dataset.")
+	#保存深度时使用的深度刻度。仅在保存数据集时使用
 	parser.add_argument("--depth_scale", default=10.0, type=float, help="Depth scale used when saving depth. Only used when saving dataset.")
+	#如果数据集存在，重写数据集
 	parser.add_argument("--overwrite", action="store_true", help="Rewrite over dataset if it exists.")
 	return parser.parse_args()
 
@@ -76,24 +81,24 @@ def set_frame(testbed, frame_idx: int, rgb: np.ndarray, depth: np.ndarray, depth
 
 
 def live_streaming_loop(reader: DataReader, max_cameras: int):
-	# Start InstantNGP
+	# Start InstantNGP开始 InstantNGP
 	testbed = ngp.Testbed(ngp.TestbedMode.Nerf)
 	testbed.init_window(1920, 1080)
 	testbed.reload_network_from_file()
 	testbed.visualize_unit_cube = True
 	testbed.nerf.visualize_cameras = True
 
-	camera_index = 0  # Current camera index we are replacing in InstantNGP
-	total_frames = 0 # Total frames received
+	camera_index = 0  # Current camera index we are replacing in InstantNGP我们即将替换的当前摄像机索引
+	total_frames = 0 # Total frames received接收的总帧数
 
-	# Create Empty Dataset
+	# Create Empty Dataset创建空数据集
 	testbed.create_empty_nerf_dataset(max_cameras, aabb_scale=1)
 	testbed.nerf.training.n_images_for_training = 0
 	testbed.up_dir = np.array([1.0, 0.0, 0.0])
 
-	# Start InstantNGP and DDS Loop
+	# Start InstantNGP and DDS Loop启动InstantNGP和DDS环路
 	while testbed.frame():
-		sample = reader.read_next() # Get frame from NeRFCapture
+		sample = reader.read_next() # Get frame from NeRFCapture从NeRFCapture获取帧
 		if sample:
 			print(f"Frame {total_frames + 1} received")
 
@@ -103,7 +108,7 @@ def live_streaming_loop(reader: DataReader, max_cameras: int):
 			image = np.concatenate(
 				[image, np.zeros((sample.height, sample.width, 1), dtype=np.float32)], axis=-1)
 
-			# Depth if available
+			# Depth if available深度(如果有)
 			depth = None
 			if sample.has_depth:
 				depth = np.asarray(sample.depth_image, dtype=np.uint8).view(
@@ -115,7 +120,7 @@ def live_streaming_loop(reader: DataReader, max_cameras: int):
 			X_WV = np.asarray(sample.transform_matrix,
 							dtype=np.float32).reshape((4, 4)).T[:3, :].copy()
 
-			# Add frame to InstantNGP
+			# Add frame to InstantNGP将框架添加到InstantNGP
 			set_frame(testbed,
 					frame_idx=camera_index,
 					rgb=srgb_to_linear(image),
@@ -139,16 +144,16 @@ def live_streaming_loop(reader: DataReader, max_cameras: int):
 def dataset_capture_loop(reader: DataReader, save_path: Path, overwrite: bool, n_frames: int):
 	if save_path.exists():
 		if overwrite:
-			# Prompt user to confirm deletion
+			# Prompt user to confirm deletion提示用户确认删除
 			if (input(f"warning! folder '{save_path}' will be deleted/replaced. continue? (Y/n)").lower().strip()+"y")[:1] != "y":
 				sys.exit(1)
-			shutil.rmtree(save_path)
+			shutil.rmtree(save_path)#递归的删除文件
 		else:
 			print(f"save_path {save_path} already exists")
 			sys.exit(1)
 
 	print("Waiting for frames...")
-	# Make directory
+	# Make directory制作目录
 	images_dir = save_path.joinpath("images")
 
 	manifest = {
@@ -161,9 +166,9 @@ def dataset_capture_loop(reader: DataReader, save_path: Path, overwrite: bool, n
 		"frames": []
 	}
 
-	total_frames = 0 # Total frames received
+	total_frames = 0 # Total frames received接收的总帧数
 
-	# Start DDS Loop
+	# Start DDS Loop启动DDS环路
 	while True:
 		sample = reader.read_next() # Get frame from NeRFCapture
 		if sample:
@@ -180,11 +185,11 @@ def dataset_capture_loop(reader: DataReader, save_path: Path, overwrite: bool, n
 				manifest["fl_y"] = sample.fl_y
 				manifest["integer_depth_scale"] = float(args.depth_scale)/65535.0
 
-			# RGB
+			# RGB；cv2.cvtColor(p1,p2)颜色空间转换函数，p1是需要转换的图片，p2是转换成何种格式
 			image = np.asarray(sample.image, dtype=np.uint8).reshape((sample.height, sample.width, 3))
 			cv2.imwrite(str(images_dir.joinpath(f"{total_frames}.png")), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
 
-			# Depth if avaiable
+			# Depth if avaiable深度(如果有)
 			depth = None
 			if sample.has_depth:
 				depth = np.asarray(sample.depth_image, dtype=np.uint8).view(
@@ -218,7 +223,7 @@ def dataset_capture_loop(reader: DataReader, save_path: Path, overwrite: bool, n
 			if total_frames == n_frames - 1:
 				print("Saving manifest...")
 				# Write manifest as json
-				manifest_json = json.dumps(manifest, indent=4)
+				manifest_json = json.dumps(manifest, indent=4)#把python对象转换成json对象，生成的是字符串
 				with open(save_path.joinpath("transforms.json"), "w") as f:
 					f.write(manifest_json)
 				print("Done")
@@ -229,9 +234,10 @@ def dataset_capture_loop(reader: DataReader, save_path: Path, overwrite: bool, n
 if __name__ == "__main__":
 	args = parse_args()
 
-	# Setup DDS
+	# Setup DDS设置DDS
 	domain = Domain(domain_id=0, config=dds_config)
 	participant = DomainParticipant()
+	#Reliability尝试传输数据但不保证成功传输(当网络不稳定时可能丢失数据)；可靠的(Reliable)：反复重传以保证数据成功传输。
 	qos = Qos(Policy.Reliability.Reliable(
 		max_blocking_time=duration(seconds=1)))
 	topic = Topic(participant, "Frames", NeRFCaptureFrame, qos=qos)
