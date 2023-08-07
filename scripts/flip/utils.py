@@ -37,20 +37,20 @@ import numpy as np
 from PIL import Image
 
 def HWCtoCHW(x):
-	return np.rollaxis(x, 2)
+	return np.rollaxis(x, 2)#向后滚动指定轴，直到它位于给定的位置
 
 
 def CHWtoHWC(x):
-	return np.swapaxes(np.swapaxes(x, 0, 1), 1, 2)
+	return np.swapaxes(np.swapaxes(x, 0, 1), 1, 2)#将n维数组中两个维度进行调换
 
 
 def save_image(img_file, img):
 	img_array = (np.clip(img, 0.0, 1.0) * 255.0).astype(np.uint8)
-	im = Image.fromarray(img_array)
+	im = Image.fromarray(img_array)#array转换成image
 	im.save(img_file)
 
 def load_image_array(img_file):
-    img = Image.open(img_file, 'r').convert('RGB')
+    img = Image.open(img_file, 'r').convert('RGB')#转换为RGB三通道
     img = np.asarray(img).astype(np.float32)
     img = HWCtoCHW(img)
     img = img / 255.0
